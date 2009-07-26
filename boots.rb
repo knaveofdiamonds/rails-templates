@@ -29,6 +29,7 @@ gem "authlogic"
 gem "configatron"
 gem "date-performance", :lib => "date/performance"
 gem "mislav-will_paginate", :lib => "will_paginate", :source => "http://gems.github.com"
+gem "justinfrench-formtastic", :lib => "formtastic", :source => "http://gems.github.com"
 
 # Testing tools
 gem :faker, :env => "test"
@@ -47,8 +48,9 @@ plugin :rails_sql_views,
   :git => "git://github.com/aeden/rails_sql_views.git", :submodule => true
 plugin :no_peeping_toms, 
   :git => "git://github.com/pat-maddox/no-peeping-toms.git", :submodule => true
+plugin :jrails, 
+  :git => "git://github.com/aaronchi/jrails.git", :submodule => true
 
-# Not using rake command because I want gems to be installed globally, not in ~/.gem
 rake "gems:install", :sudo => true
 
 # Clear out some irrelevant files
@@ -116,7 +118,7 @@ generate :cucumber
 generate :session, "UserSession"
 
 rake "db:create"
-rake "db:create RAILS_ENV=test"
+rake "db:create", :env => 'test'
 
 git :add => "."
 git :commit => "-a -m 'Additions from boots rails template'"
