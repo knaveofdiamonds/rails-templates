@@ -14,7 +14,7 @@ debconf-set-selections < tmp_mysql_install_settings.txt
 rm tmp_mysql_install_settings.txt
 
 # Install packages
-aptitude -y install emacs22 git-core ruby ruby1.8-dev irb mysql-client mysql-server wget build-essential libmysqlclient15-dev libxml2-dev autoconf libreadline-ruby libopenssl-ruby rsync
+aptitude -y install emacs22 git-core ruby ruby1.8-dev irb mysql-client mysql-server wget build-essential libmysqlclient15-dev libxml2-dev autoconf libreadline-ruby libopenssl-ruby rsync libxslt1-dev
 
 # Get and install rubygems
 chgrp admin /usr/local/src
