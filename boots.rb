@@ -110,6 +110,8 @@ end
 FILE
 end
 
+file "test/blueprints.rb", "# Add your model blueprints to this file\n"
+
 env_file = File.read("config/environment.rb")
 env_file.sub!(/^end$/, "  config.active_record.timestamped_migrations = false\nend")
 file "config/environment.rb", env_file
