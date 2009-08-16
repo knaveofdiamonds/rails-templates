@@ -1,18 +1,17 @@
 APP_NAME = @root.split('/').last
 # Is rails app part of a larger, pre-gitified project or not?
 # For some reason git status returns 256 instead of 0 when successful on my system
-SUBPROJECT = system("git status > /dev/null 2> /dev/null") || $? == 256
-
+SUBPROJECT      = system("git status > /dev/null 2> /dev/null") || $? == 256
+INSTALL_GEMS    = yes?("Install gems?")
+INSTALL_PLUGINS = yes?("Install plugins?")
+USE_OID         = yes?("Use open id?")
+DEPLOY_TO       = ask("What is the production server address?").strip
 git :init unless SUBPROJECT
 
 # Git ignore files
 file "log/.gitignore", <<-FILE
 *.log
 *.pid
-FILE
-
-file ".gitignore", <<-FILE
-config/database.yml
 FILE
 
 file "tmp/.gitignore", <<-FILE
@@ -22,15 +21,23 @@ FILE
 git :add => "."
 git :commit => "-m 'Initial rails skeleton commit'"
 
+run "rm public/javascripts/*.js"
+run "cp /usr/local/share/jquery/jquery-1.3.2.js public/javascripts/jquery-1.3.2.js"
+git :commit => "-am 'Replacing prototype/scriptaculous with jquery'"
+
 # Gems
-gem "authlogic-oid", :lib => "authlogic_openid"
-gem "ruby-openid", :lib => "openid"
-gem "authlogic"
 gem "configatron"
 gem "date-performance", :lib => "date/performance"
 gem "mislav-will_paginate", :lib => "will_paginate", :source => "http://gems.github.com"
 gem "justinfrench-formtastic", :lib => "formtastic", :source => "http://gems.github.com"
 gem "knave_extras", :lib => "knave_extras", :source => "http://gems.github.com"
+gem "rack_hoptoad"
+
+if USE_OID
+  gem "authlogic-oid", :lib => "authlogic_openid"
+  gem "ruby-openid", :lib => "openid"
+end
+gem "authlogic"
 
 # Testing tools
 gem :faker, :env => "test"
@@ -40,12 +47,12 @@ gem :mocha, :env => "test"
 gem :webrat, :env => "test"
 gem :cucumber, :env => "test"
 
-if yes?("Install plugins?")
+if INSTALL_GEMS
+  rake "gems:install", :sudo => true
+end
+
+if INSTALL_PLUGINS
   # Plugins
-  plugin :open_id_authentication, 
-    :git => "git://github.com/rails/open_id_authentication.git", :submodule => true
-  plugin :hoptoad_notifier, 
-    :git => "git://github.com/thoughtbot/hoptoad_notifier.git", :submodule => true
   plugin :rails_sql_views, 
     :git => "git://github.com/aeden/rails_sql_views.git", :submodule => true
   plugin :no_peeping_toms, 
@@ -54,23 +61,27 @@ if yes?("Install plugins?")
 #  :git => "git://github.com/aaronchi/jrails.git", :submodule => true
   plugin :validation_reflection, 
     :git => "git://github.com/redinger/validation_reflection.git", :submodule => true
+
+  if USE_OID
+    plugin :open_id_authentication, 
+      :git => "git://github.com/rails/open_id_authentication.git", :submodule => true
+  end
 end
 
-if yes?("Install gems?")
-  rake "gems:install", :sudo => true
+file "app/models/user.rb", <<-FILE
+class User < ActiveRecord::Base
+  acts_as_authentic
 end
+FILE
 
 # Clear out some irrelevant files
 run "rm public/index.html"
 run "rm README"
 run "rm public/favicon.ico"
 run "rm public/images/rails.png"
-run "rm public/javascripts/*.js"
-run "rm config/database.yml"
-run "cp /usr/local/share/jquery/jquery-1.3.2.js public/javascripts/jquery-1.3.2.js"
 
 # Database.yml
-file "config/database.yml.example", <<-FILE
+file "config/database.yml", <<-FILE
 development: &default_settings 
   adapter: mysql
   encoding: utf8
@@ -91,12 +102,12 @@ production:
   username: #{APP_NAME}
   password:
 FILE
-run "cp config/database.yml.example config/database.yml"
 
 # Deployment configuration
 file "config/deploy.rb", <<-FILE
 set :application, "#{APP_NAME}"
-set :domain, "10.37.129.3"
+\#set :domain, "10.37.129.3"
+set :domain, "#{DEPLOY_TO}"
 set :deploy_to, "/usr/local/share/sites/\#{application}"
 set :scm_path, "\#{deploy_to}/\#{application}.git"
 set :revision, "HEAD"
@@ -119,15 +130,23 @@ FILE
 end
 
 file "test/blueprints.rb", "# Add your model blueprints to this file\n"
-
-
 environment "config.active_record.timestamped_migrations = false"
+initializer "hoptoad.rb", "config.middleware.use \"Rack::HoptoadNotifier\", \"HOPTOAD API KEY HERE\""
 
 generate :cucumber
 generate :session, "UserSession"
+generate :controller, "UserSessions new create destroy"
+rake "open_id_authentication:db:create"
+route "map.resources :user_sessions"
+
+user_options = ["User", "name:string", "username:string", "email:string"]
+user_options << "openid_identifier:string" if USE_OID
+generate :scaffold, user_options.join(" ")
 
 rake "db:create"
 rake "db:create", :env => 'test'
+rake "db:migrate"
+rake "db:test:clone"
 
 git :add => "."
 git :commit => "-a -m 'Additions from boots rails template'"
