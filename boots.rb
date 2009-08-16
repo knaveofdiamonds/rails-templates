@@ -5,7 +5,9 @@ SUBPROJECT      = system("git status > /dev/null 2> /dev/null") || $? == 256
 INSTALL_GEMS    = yes?("Install gems?")
 INSTALL_PLUGINS = yes?("Install plugins?")
 USE_OID         = yes?("Use open id?")
-DEPLOY_TO       = ask("What is the production server address?").strip
+address = ask("What is the production server address?").strip
+DEPLOY_TO = address.present?() ? address : "192.168.0.10"
+
 git :init unless SUBPROJECT
 
 # Git ignore files
@@ -24,6 +26,23 @@ git :commit => "-m 'Initial rails skeleton commit'"
 run "rm public/javascripts/*.js"
 run "cp /usr/local/share/jquery/jquery-1.3.2.js public/javascripts/jquery-1.3.2.js"
 git :commit => "-am 'Replacing prototype/scriptaculous with jquery'"
+
+# Environment files
+
+file "config/environment.rb", <<-FILE
+RAILS_GEM_VERSION = '#{Rails::VERSION::STRING}' unless defined? RAILS_GEM_VERSION
+require File.join(File.dirname(__FILE__), 'boot')
+
+Rails::Initializer.run do |config|
+  config.frameworks -= [ :active_resource ]
+  config.active_record.timestamped_migrations = false
+  config.time_zone = 'UTC'
+  # config.active_record.observers = :some_observer
+end
+FILE
+
+environment "config.cache_store = :mem_cache_store", :env => :production
+environment "config.middleware.use 'Rack::HoptoadNotifier', 'YOUR HOPTOAD KEY'", :env => :production
 
 # Gems
 gem "configatron"
@@ -57,8 +76,8 @@ if INSTALL_PLUGINS
     :git => "git://github.com/aeden/rails_sql_views.git", :submodule => true
   plugin :no_peeping_toms, 
     :git => "git://github.com/pat-maddox/no-peeping-toms.git", :submodule => true
-# plugin :jrails, 
-#  :git => "git://github.com/aaronchi/jrails.git", :submodule => true
+  plugin :jrails, 
+    :git => "git://github.com/aaronchi/jrails.git", :submodule => true
   plugin :validation_reflection, 
     :git => "git://github.com/redinger/validation_reflection.git", :submodule => true
 
@@ -67,12 +86,6 @@ if INSTALL_PLUGINS
       :git => "git://github.com/rails/open_id_authentication.git", :submodule => true
   end
 end
-
-file "app/models/user.rb", <<-FILE
-class User < ActiveRecord::Base
-  acts_as_authentic
-end
-FILE
 
 # Clear out some irrelevant files
 run "rm public/index.html"
@@ -103,6 +116,9 @@ production:
   password:
 FILE
 
+rake "db:create"
+rake "db:create", :env => 'test'
+
 # Deployment configuration
 file "config/deploy.rb", <<-FILE
 set :application, "#{APP_NAME}"
@@ -130,8 +146,6 @@ FILE
 end
 
 file "test/blueprints.rb", "# Add your model blueprints to this file\n"
-environment "config.active_record.timestamped_migrations = false"
-initializer "hoptoad.rb", "config.middleware.use \"Rack::HoptoadNotifier\", \"HOPTOAD API KEY HERE\""
 
 generate :cucumber
 generate :session, "UserSession"
@@ -139,12 +153,89 @@ generate :controller, "UserSessions new create destroy"
 rake "open_id_authentication:db:create"
 route "map.resources :user_sessions"
 
-user_options = ["User", "name:string", "username:string", "email:string"]
+user_options = ["User", "name:string", "username:string", "email:string", "--skip-migration"]
 user_options << "openid_identifier:string" if USE_OID
 generate :scaffold, user_options.join(" ")
 
-rake "db:create"
-rake "db:create", :env => 'test'
+file "app/models/user.rb", <<-FILE
+class User < ActiveRecord::Base
+  acts_as_authentic
+end
+FILE
+
+file "db/migrate/002_create_users.rb", <<-FILE
+class CreateUsers < ActiveRecord::Migration
+  def self.up
+    create_table :users do |t|
+      t.timestamps
+    end
+  end
+
+  def self.down
+    drop_table :users
+  end
+end
+FILE
+
+file "app/controllers/application_controller.rb", <<-FILE
+# Filters added to this controller apply to all controllers in the application.
+# Likewise, all the methods added will be available for all controllers.
+
+class ApplicationController < ActionController::Base
+  helper :all
+  helper_method :current_user_session, :current_user
+  filter_parameter_logging :password, :password_confirmation
+  protect_from_forgery # See ActionController::RequestForgeryProtection for details
+
+  protected
+
+  def current_user_session
+    return @current_user_session if defined?(@current_user_session)
+    @current_user_session = UserSession.find
+  end
+    
+  def current_user
+    return @current_user if defined?(@current_user)
+    @current_user = current_user_session && current_user_session.record
+  end
+    
+  def store_location
+    session[:return_to] = request.request_uri
+  end
+    
+  def redirect_back_or_default(default)
+    redirect_to(session[:return_to] || default)
+    session[:return_to] = nil
+  end
+end
+FILE
+
+file "app/controllers/user_sessions_controller.rb", <<-FILE
+class UserSessionsController < ApplicationController
+  def new
+    @user_session = UserSession.new
+  end
+  
+  def create
+    @user_session = UserSession.new(params[:user_session])
+    @user_session.save do |result|
+      if result
+        flash[:notice] = "Welcome back."
+        redirect_back_or_default account_url
+      else
+        render :action => :new
+      end
+    end
+  end
+  
+  def destroy
+    current_user_session.destroy
+    flash[:notice] = "Logged out successfully."
+    redirect_back_or_default new_user_session_url
+  end
+end
+FILE
+
 rake "db:migrate"
 rake "db:test:clone"
 
