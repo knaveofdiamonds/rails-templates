@@ -30,6 +30,7 @@ gem "configatron"
 gem "date-performance", :lib => "date/performance"
 gem "mislav-will_paginate", :lib => "will_paginate", :source => "http://gems.github.com"
 gem "justinfrench-formtastic", :lib => "formtastic", :source => "http://gems.github.com"
+gem "knave_extras", :lib => "knave_extras", :source => "http://gems.github.com"
 
 # Testing tools
 gem :faker, :env => "test"
@@ -39,19 +40,25 @@ gem :mocha, :env => "test"
 gem :webrat, :env => "test"
 gem :cucumber, :env => "test"
 
-# Plugins
-plugin :open_id_authentication, 
-  :git => "git://github.com/rails/open_id_authentication.git", :submodule => true
-plugin :hoptoad_notifier, 
-  :git => "git://github.com/thoughtbot/hoptoad_notifier.git", :submodule => true
-plugin :rails_sql_views, 
-  :git => "git://github.com/aeden/rails_sql_views.git", :submodule => true
-plugin :no_peeping_toms, 
-  :git => "git://github.com/pat-maddox/no-peeping-toms.git", :submodule => true
-plugin :jrails, 
-  :git => "git://github.com/aaronchi/jrails.git", :submodule => true
+if yes?("Install plugins?")
+  # Plugins
+  plugin :open_id_authentication, 
+    :git => "git://github.com/rails/open_id_authentication.git", :submodule => true
+  plugin :hoptoad_notifier, 
+    :git => "git://github.com/thoughtbot/hoptoad_notifier.git", :submodule => true
+  plugin :rails_sql_views, 
+    :git => "git://github.com/aeden/rails_sql_views.git", :submodule => true
+  plugin :no_peeping_toms, 
+    :git => "git://github.com/pat-maddox/no-peeping-toms.git", :submodule => true
+# plugin :jrails, 
+#  :git => "git://github.com/aaronchi/jrails.git", :submodule => true
+  plugin :validation_reflection, 
+    :git => "git://github.com/redinger/validation_reflection.git", :submodule => true
+end
 
-rake "gems:install", :sudo => true
+if yes?("Install gems?")
+  rake "gems:install", :sudo => true
+end
 
 # Clear out some irrelevant files
 run "rm public/index.html"
@@ -89,10 +96,11 @@ run "cp config/database.yml.example config/database.yml"
 # Deployment configuration
 file "config/deploy.rb", <<-FILE
 set :application, "#{APP_NAME}"
-set :domain, "192.168.0.10"
+set :domain, "10.37.129.3"
 set :deploy_to, "/usr/local/share/sites/\#{application}"
-set :repository, "ssh://192.168.0.4#{@root}"
-set :revision, "head"
+set :scm_path, "\#{deploy_to}/\#{application}.git"
+set :revision, "HEAD"
+set :remote_name, "production"
 FILE
 
 rakefile("vlad.rake") do
@@ -101,7 +109,7 @@ begin
   require 'vlad'
   require 'vlad/core'
   require 'vlad/passenger'
-  require 'vlad/git'
+  require 'knave_extras/tasks/vlad'
 
   Kernel.load 'config/deploy.rb'
 rescue LoadError
@@ -112,9 +120,8 @@ end
 
 file "test/blueprints.rb", "# Add your model blueprints to this file\n"
 
-env_file = File.read("config/environment.rb")
-env_file.sub!(/^end$/, "  config.active_record.timestamped_migrations = false\nend")
-file "config/environment.rb", env_file
+
+environment "config.active_record.timestamped_migrations = false"
 
 generate :cucumber
 generate :session, "UserSession"
