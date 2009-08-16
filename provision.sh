@@ -14,11 +14,14 @@ debconf-set-selections < tmp_mysql_install_settings.txt
 rm tmp_mysql_install_settings.txt
 
 # Install packages
-aptitude -y install emacs22 git-core ruby ruby1.8-dev irb mysql-client mysql-server wget build-essential libmysqlclient15-dev libxml2-dev autoconf libreadline-ruby libopenssl-ruby rsync libxslt1-dev
+aptitude -y install emacs22 git-core ruby ruby1.8-dev irb mysql-client mysql-server wget build-essential libmysqlclient15-dev libxml2-dev autoconf libreadline-ruby libopenssl-ruby rsync libxslt1-dev libmemcache-dev memcached
 
 # Install mysql timezones
 mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root --pasword=qwerty
 
+# Drop memcached memory, we're only on a little VPS
+sed -i s/-m\ 64/-m\ 16/ /etc/memcached.conf
+/etc/init.d/memcached restart
 
 # Get and install rubygems
 chgrp admin /usr/local/src
@@ -32,7 +35,7 @@ ln -s /usr/bin/gem1.8 /usr/bin/gem
 gem sources --add http://gems.github.com/
 
 # Install gems
-gem install mysql rails rake passenger --no-rdoc --no-ri
+gem install memcache-client mysql rails rake passenger --no-rdoc --no-ri
 
 # Install nginx/passenger
 passenger-install-nginx-module --auto --auto-download --prefix=/usr/local/nginx
