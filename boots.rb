@@ -41,9 +41,6 @@ Rails::Initializer.run do |config|
 end
 FILE
 
-environment "config.cache_store = :mem_cache_store", :env => :production
-environment "config.middleware.use 'Rack::HoptoadNotifier', 'YOUR HOPTOAD KEY'", :env => :production
-
 # Gems
 gem "configatron"
 gem "date-performance", :lib => "date/performance"
@@ -51,6 +48,10 @@ gem "mislav-will_paginate", :lib => "will_paginate", :source => "http://gems.git
 gem "justinfrench-formtastic", :lib => "formtastic", :source => "http://gems.github.com"
 gem "knave_extras", :lib => "knave_extras", :source => "http://gems.github.com"
 gem "rack_hoptoad"
+
+gem "less", :lib => false, :env => :development
+gem "sickill-rack-lesscss", :lib => "rack-lesscss", :env => :development
+
 
 if USE_OID
   gem "authlogic-oid", :lib => "authlogic_openid"
@@ -69,6 +70,10 @@ gem :cucumber, :env => "test"
 if INSTALL_GEMS
   rake "gems:install", :sudo => true
 end
+
+environment "config.cache_store = :mem_cache_store", :env => :production
+environment "config.middleware.use 'Rack::HoptoadNotifier', 'YOUR HOPTOAD KEY'", :env => :production
+environment "config.middleware.use 'Rack::LessCSS', :less_path => File.join(APP_ROOT, 'public', 'css')", :env => :development
 
 if INSTALL_PLUGINS
   # Plugins
