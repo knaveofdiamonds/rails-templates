@@ -152,6 +152,51 @@ end
 
 file "test/blueprints.rb", "# Add your model blueprints to this file\n"
 
+file "app/views/layouts/application.html.erb", <<-FILE
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+       "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
+  <title><%= controller.action_name %></title>
+  <%= stylesheet_link_tag 'resets' %>
+  <%= stylesheet_link_tag 'typography' %>
+</head>
+<body>
+
+<p style="color: green"><%= flash[:notice] %></p>
+
+<%= yield %>
+
+<% unless Rails.env.development? %>
+  <!--
+    <script type="text/javascript">
+      var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+      document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+    </script>
+    <script type="text/javascript">
+      var pageTracker = _gat._getTracker("<%= google_analytics_token %>");
+      pageTracker._initData();
+      pageTracker._trackPageview();
+    </script>
+  -->
+<% end %>
+</body>
+</html>
+FILE
+
+file "app/helpers/application_helper.rb", <<-FILE
+# Methods added to this helper will be available to all templates in the application.
+module ApplicationHelper
+  def google_analytics_token
+    # Return a string with your google analytics token here.
+    ""
+  end
+end
+FILE
+
+generate :styles
 generate :cucumber
 generate :session, "UserSession"
 generate :controller, "UserSessions new create destroy"
