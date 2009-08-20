@@ -48,16 +48,8 @@ gem "mislav-will_paginate", :lib => "will_paginate", :source => "http://gems.git
 gem "justinfrench-formtastic", :lib => "formtastic", :source => "http://gems.github.com"
 gem "knave_extras", :lib => "knave_extras", :source => "http://gems.github.com"
 gem "rack_hoptoad"
-
-gem "less", :lib => false, :env => :development
-gem "sickill-rack-lesscss", :lib => "rack-lesscss", :env => :development
-
-
-if USE_OID
-  gem "authlogic-oid", :lib => "authlogic_openid"
-  gem "ruby-openid", :lib => "openid"
-end
-gem "authlogic"
+gem "ruby-openid", :lib => "openid" if USE_OID
+gem "less", :lib => false
 
 # Testing tools
 gem :faker, :env => "test"
@@ -73,7 +65,6 @@ end
 
 environment "config.cache_store = :mem_cache_store", :env => :production
 environment "config.middleware.use 'Rack::HoptoadNotifier', 'YOUR HOPTOAD KEY'", :env => :production
-environment "config.middleware.use 'Rack::LessCSS', :less_path => File.join(APP_ROOT, 'public', 'css')", :env => :development
 
 if INSTALL_PLUGINS
   # Plugins
@@ -85,6 +76,8 @@ if INSTALL_PLUGINS
     :git => "git://github.com/aaronchi/jrails.git", :submodule => true
   plugin :validation_reflection, 
     :git => "git://github.com/redinger/validation_reflection.git", :submodule => true
+  plugin :less_for_rails, 
+    :git => "git://github.com/augustl/less-for-rails.git", :submodule => true
 
   if USE_OID
     plugin :open_id_authentication, 
@@ -198,93 +191,8 @@ FILE
 
 generate :styles
 generate :cucumber
-generate :session, "UserSession"
-generate :controller, "UserSessions new create destroy"
-rake "open_id_authentication:db:create"
-route "map.resources :user_sessions"
 
-user_options = ["User", "name:string", "username:string", "email:string", "--skip-migration"]
-user_options << "openid_identifier:string" if USE_OID
-generate :scaffold, user_options.join(" ")
-
-file "app/models/user.rb", <<-FILE
-class User < ActiveRecord::Base
-  acts_as_authentic
-end
-FILE
-
-file "db/migrate/002_create_users.rb", <<-FILE
-class CreateUsers < ActiveRecord::Migration
-  def self.up
-    create_table :users do |t|
-      t.timestamps
-    end
-  end
-
-  def self.down
-    drop_table :users
-  end
-end
-FILE
-
-file "app/controllers/application_controller.rb", <<-FILE
-# Filters added to this controller apply to all controllers in the application.
-# Likewise, all the methods added will be available for all controllers.
-
-class ApplicationController < ActionController::Base
-  helper :all
-  helper_method :current_user_session, :current_user
-  filter_parameter_logging :password, :password_confirmation
-  protect_from_forgery # See ActionController::RequestForgeryProtection for details
-
-  protected
-
-  def current_user_session
-    return @current_user_session if defined?(@current_user_session)
-    @current_user_session = UserSession.find
-  end
-    
-  def current_user
-    return @current_user if defined?(@current_user)
-    @current_user = current_user_session && current_user_session.record
-  end
-    
-  def store_location
-    session[:return_to] = request.request_uri
-  end
-    
-  def redirect_back_or_default(default)
-    redirect_to(session[:return_to] || default)
-    session[:return_to] = nil
-  end
-end
-FILE
-
-file "app/controllers/user_sessions_controller.rb", <<-FILE
-class UserSessionsController < ApplicationController
-  def new
-    @user_session = UserSession.new
-  end
-  
-  def create
-    @user_session = UserSession.new(params[:user_session])
-    @user_session.save do |result|
-      if result
-        flash[:notice] = "Welcome back."
-        redirect_back_or_default account_url
-      else
-        render :action => :new
-      end
-    end
-  end
-  
-  def destroy
-    current_user_session.destroy
-    flash[:notice] = "Logged out successfully."
-    redirect_back_or_default new_user_session_url
-  end
-end
-FILE
+rake "open_id_authentication:db:create" if USE_OID
 
 rake "db:migrate"
 rake "db:test:clone"
